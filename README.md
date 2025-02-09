@@ -119,7 +119,6 @@
     .kpiUnified {
       flex: 1;
       padding: 15px;
-      /* ベースカラーを意識しつつ色を変える（より濃いグラデーション） */
       background: linear-gradient(
         135deg,
         rgba(209, 196, 233, 0.5) 0%,
@@ -145,22 +144,22 @@
     .kpiUnified-row {
       display: flex;
       gap: 20px;
-      align-items: flex-start; /* 修正：上揃えにする */
+      align-items: flex-start; /* 上揃え */
       justify-content: space-around;
       flex-wrap: wrap;
     }
     .kpiUnified-col {
       flex: 1;
       min-width: 120px;
-      text-align: left; /* 左寄せ */
+      text-align: left;
       display: flex;
       flex-direction: column;
       justify-content: flex-start; /* 上揃え */
     }
     /* 項目名は小さく */
     .kpiUnified-col h3 {
-      margin-bottom: 2px; /* 隙間をより小さく */
-      font-size: 0.8rem; /* 小さく */
+      margin-bottom: 2px;
+      font-size: 0.8rem;
       font-weight: 700;
       color: #4a2d68;
       text-transform: uppercase;
@@ -173,17 +172,17 @@
       white-space: pre-line;
     }
     .kpiUnified-col p strong {
-      font-size: 3.2em; /* 大きく */
+      font-size: 3.2em;
       font-weight: 900;
-      color: #3b1f57; /* より濃い紫系 */
+      color: #3b1f57;
     }
 
     /* 達成月の(～か月後)は小さく、太字ではない */
     .achieve-later {
-      font-size: 0.7em; /* 目安表と同じぐらいの文字サイズ */
+      font-size: 0.7em;
       font-weight: normal;
       color: #333;
-      margin-top: -0.1em; /* 隙間を狭く */
+      margin-top: -0.1em;
       display: inline-block;
     }
 
@@ -197,7 +196,7 @@
       overflow: hidden;
     }
     thead {
-      background: rgba(209, 196, 233, 0.4); /* ラベンダーをさらに薄く */
+      background: rgba(209, 196, 233, 0.4);
     }
     th,
     td {
@@ -437,134 +436,145 @@
 
   <script>
     /************************************************
-     * シミュレーションロジック（KPI算出）
-     *
-     * 【ターゲット値】
-     *  サンプル配布数: 30
-     *  講座参加数: floor(newReg * (21/11)) ※目標率70%
-     *  新規登録者数（メンバー登録数）: newReg （目標率50% 目標値11の場合）
-     *  定期購入契約者数（LRP継続者数）: floor(newReg * (8/11)) ※目標率80%
-     *  ユーザー: 同じ
-     *  シェアラー: floor(newReg * (4/11)) ※目標率50%
-     *  ビルダー育成数: floor(newReg * (1/11)) ※目標率20%
-     *
-     * 各月の数値は、入力された「新規登録者目標数(月平均)」（newReg）をもとに算出する。
-     *
-     * OV（PV予測）の算出：
-     *  ・月0: OV = currentPV + (新規登録者数 * 150)
-     *  ・月1以降: OV = currentPV + ((新規登録者数 + 累積LRP継続者数) * 150)
-     *    ※累積LRP継続者数は、各月で floor(newReg * (8/11)) を累積
-     *  OVの表示はtoLocaleString()でカンマ区切り
-     *
-     * ※各行のラベルは、入力された【目標設定日】を基準に「YYYY年M月」として表示。
-     *    年切替時は、その行に "year-break" クラスを付与して視覚的に区切る。
+     * シミュレーションロジック:
+     * LRP継続者数は毎月累積
+     * User = 累積 LRP
+     * シェアラー = 50% of User (その月時点), 累積しない
+     * ビルダー育成数 = 20% of シェアラー(その月), 累積しない
+     * OV = currentPV + (月数 × newReg × 150)
+     *   初月 m=0 => currentPV + (newReg * 150)
+     *   2ヶ月目 => currentPV + (2* newReg * 150)
+     *   ...
      ************************************************/
+
     function recalcKpiData() {
-      const newRegInput = parseFloat(document.getElementById("monthlyTarget").value) || 7;
+      const newRegInput = parseFloat(document.getElementById("monthlyTarget").value)||7;
       const newReg = Math.floor(newRegInput);
+
       let currentPV = parseFloat(document.getElementById("currentPV").value);
-      if (isNaN(currentPV)) currentPV = 3000;
+      if(isNaN(currentPV)) currentPV=3000;
 
-      // 入力された目標設定日を基準に
       const targetDateStr = document.getElementById("targetDate").value;
-      let startDate = targetDateStr ? new Date(targetDateStr) : new Date();
+      let startDate = targetDateStr ? new Date(targetDateStr): new Date();
 
-      // KPI算出：
-      const sampleMonthly = Math.floor(newReg * (30 / 11));
-      const lectureMonthly = Math.floor(newReg * (21 / 11));
-      // 新規登録者数 = newReg
-      const lrpMonthly = Math.floor(newReg * (8 / 11));
-      const sharer = Math.floor(newReg * (4 / 11));
-      const builder = Math.floor(newReg * (1 / 11));
+      // サンプル配布数 = floor(newReg*(30/11))
+      // 講座参加数     = floor(newReg*(21/11))
+      // 新規登録者数   = newReg
+      // LRP継続率80% => LRP= floor(newReg*0.8) (月ごと追加)
 
-      // OVの単位は150PV
-      const ovMultiplier = 150;
-      let simData = [];
-      let cumLRP = 0;
-      let prevYear = startDate.getFullYear();
+      const sampleEach = Math.floor(newReg*(30/11));
+      const lectureEach= Math.floor(newReg*(21/11));
+      const lrpEach   = Math.floor(newReg*0.8);
 
-      for (let m = 0; m < 24; m++) {
+      // OV multiplier
+      const ovMultiplier=150;
+
+      let simData=[];
+
+      // 累積LRP
+      let cumLRP=0;
+      let prevYear;
+
+      for(let m=0; m<24; m++) {
         let simDate = new Date(
           startDate.getFullYear(),
-          startDate.getMonth() + m,
+          startDate.getMonth()+m,
           startDate.getDate()
         );
-        let monthLabel =
-          simDate.getFullYear() + "年" + (simDate.getMonth() + 1) + "月";
-        let newYearBreak = false;
-        if (m > 0 && simDate.getFullYear() !== prevYear) {
-          newYearBreak = true;
-          prevYear = simDate.getFullYear();
-        }
-        let OV;
-        if (m === 0) {
-          // 初月: OV = currentPV + (newReg * 150)
-          OV = currentPV + newReg * ovMultiplier;
+        let newYearBreak=false;
+        if(m===0) {
+          prevYear=simDate.getFullYear();
         } else {
-          cumLRP += lrpMonthly;
-          // 以降: OV = currentPV + ((newReg + cumLRP) * 150)
-          OV = currentPV + (newReg + cumLRP) * ovMultiplier;
+          if(simDate.getFullYear()!==prevYear){
+            newYearBreak=true;
+            prevYear=simDate.getFullYear();
+          }
         }
-        const OVFormatted = OV.toLocaleString();
 
-        let row = {
-          monthLabel: monthLabel,
-          sample: sampleMonthly,
-          lecture: lectureMonthly,
-          newReg: newReg,
-          lrp: m === 0 ? "" : Math.floor(cumLRP),
-          user: m === 0 ? "" : Math.floor(cumLRP),
-          sharer: sharer,
-          builder: builder,
+        // LRP累積
+        if(m>0) {
+          cumLRP += lrpEach;
+        } else {
+          // 初月
+          cumLRP= lrpEach;
+        }
+
+        // user= cumLRP
+        // sharer= floor(user*0.5)
+        // builder= floor(sharer*0.2)
+        const user = cumLRP;
+        const sharer= Math.floor(user*0.5);
+        const builder= Math.floor(sharer*0.2);
+
+        // OV
+        // m=0 => currentPV + newReg*150
+        // m>0 => currentPV + ( (m+1)* newReg *150 )
+        let OV;
+        if(m===0) {
+          OV= currentPV + newReg*ovMultiplier;
+        } else {
+          OV= currentPV + ( (m+1)* newReg* ovMultiplier );
+        }
+        let OVFormatted= OV.toLocaleString();
+
+        let monthLabel= simDate.getFullYear()+"年"+(simDate.getMonth()+1)+"月";
+
+        simData.push({
+          monthLabel,
+          sample: sampleEach,
+          lecture: lectureEach,
+          newReg,
+          lrp: cumLRP,
+          user: cumLRP,
+          sharer,
+          builder,
           OV: OVFormatted,
-          newYearBreak: newYearBreak,
-        };
-        simData.push(row);
+          newYearBreak
+        });
       }
       return simData;
     }
 
-    /************************************************
-     * KPI 出力ブロックの更新
-     *
-     * ・年間新規登録者数 = newReg × 12
-     * ・年間 ビルダー育成数 = floor(newReg * (1/11) * 12)
-     * ・LRP継続率は固定 80%
-     * ・【目標Rank達成】は、シミュレーションのOVで初めて【goalPV】以上となる月を判定
-     ************************************************/
-    function updateKpiResults() {
-      const simData = recalcKpiData();
-      const newRegInput = parseFloat(document.getElementById("monthlyTarget").value) || 7;
-      const newReg = Math.floor(newRegInput);
-      const annualNew = Math.floor(newReg * 12);
-      const annualBuilder = Math.floor(newReg * (1 / 11) * 12);
+    // KPI出力
+    function updateKpiResults(){
+      const simData= recalcKpiData();
 
-      const goalPV = parseFloat(document.getElementById("goalPV").value) || 9000;
-      let achieveMonth = "未達";
-      let achieveMonthLine1 = "";
-      let achieveMonthLine2 = "";
+      const newRegInput= parseFloat(document.getElementById("monthlyTarget").value)||7;
+      const newReg= Math.floor(newRegInput);
 
-      for (let i = 0; i < simData.length; i++) {
-        const OV = parseInt(simData[i].OV.replace(/,/g, ""));
-        if (OV >= goalPV) {
-          // 改行させたい: 例) 2025年8月  \n  (8カ月後)
-          achieveMonthLine1 = simData[i].monthLabel;
-          achieveMonthLine2 = "(" + (i + 1) + "カ月後)";
-          achieveMonth = achieveMonthLine1 + "\n" + achieveMonthLine2;
+      // 12か月後のビルダー育成数 => simData[11].builder
+      //  (ただし、配列が0-basedなので12か月目は index=11 )
+      let builderAt12 = 0;
+      if(simData.length >= 12){
+        builderAt12 = simData[11].builder;
+      }
+
+      // 年換算 新規登録者
+      const annualNew= newReg*12;
+
+      // 目標達成
+      const goalPV= parseFloat(document.getElementById("goalPV").value)||9000;
+      let achieveMonthLine1="未達";
+      let achieveMonthLine2="";
+
+      for(let i=0; i<simData.length; i++) {
+        const ovNum= parseInt(simData[i].OV.replace(/,/g,""));
+        if(ovNum>=goalPV){
+          achieveMonthLine1=simData[i].monthLabel;
+          achieveMonthLine2=`(${i+1}カ月後)`;
           break;
         }
       }
 
-      // 上段: KPI 出力
-      const kpiResults = document.getElementById("kpiResults");
-      kpiResults.innerHTML = `
+      const kpiResults=document.getElementById("kpiResults");
+      kpiResults.innerHTML= `
         <div class="kpiUnified-col">
           <h3>新規登録者</h3>
           <p><strong>${annualNew}</strong> 名/年</p>
         </div>
         <div class="kpiUnified-col">
           <h3>ビルダー育成数</h3>
-          <p><strong>${annualBuilder}</strong> 名/年</p>
+          <p><strong>${builderAt12}</strong> 名/年</p>
         </div>
         <div class="kpiUnified-col">
           <h3>LRP継続率</h3>
@@ -572,24 +582,22 @@
         </div>
       `;
 
-      // 下段: 目標Rank達成
-      const goalMonthResult = document.getElementById("goalMonthResult");
-      const goalRank = document.getElementById("yearGoal").value;
+      const goalMonthResult= document.getElementById("goalMonthResult");
+      const goalRank= document.getElementById("yearGoal").value;
 
-      if (achieveMonth === "未達") {
-        goalMonthResult.innerHTML = `
+      if(achieveMonthLine1==="未達"){
+        goalMonthResult.innerHTML= `
           <div class="kpiUnified-col">
             <h3>目標Rank</h3>
             <p><strong>${goalRank}</strong></p>
           </div>
           <div class="kpiUnified-col">
             <h3>達成月</h3>
-            <p><strong>${achieveMonth}</strong></p>
+            <p><strong>未達</strong></p>
           </div>
         `;
       } else {
-        // line1 => bold, line2 => small normal text
-        goalMonthResult.innerHTML = `
+        goalMonthResult.innerHTML= `
           <div class="kpiUnified-col">
             <h3>目標Rank</h3>
             <p><strong>${goalRank}</strong></p>
@@ -605,15 +613,13 @@
       }
     }
 
-    /************************************************
-     * KPI シミュレーションテーブルの描画
-     ************************************************/
-    function populateKpiTable(simData) {
-      const tbody = document.getElementById("kpiTable").querySelector("tbody");
-      tbody.innerHTML = "";
-      simData.forEach((row) => {
-        const tr = document.createElement("tr");
-        if (row.newYearBreak) {
+    // シミュレーションテーブル
+    function populateKpiTable(simData){
+      const tbody= document.getElementById("kpiTable").querySelector("tbody");
+      tbody.innerHTML= "";
+      simData.forEach(row=>{
+        const tr= document.createElement("tr");
+        if(row.newYearBreak){
           tr.classList.add("year-break");
         }
         let cells = [
@@ -625,241 +631,224 @@
           row.user,
           row.sharer,
           row.builder,
-          row.OV,
+          row.OV
         ];
-        cells.forEach((cell) => {
-          const td = document.createElement("td");
-          td.textContent = cell;
+        cells.forEach(cell=>{
+          const td= document.createElement("td");
+          td.textContent= cell;
           tr.appendChild(td);
         });
         tbody.appendChild(tr);
       });
     }
 
-    /************************************************
-     * Chart.js を使ったグラフ描画
-     * （シミュレーション表から抜粋して、「新規登録者数」、「LRP継続者数」、「OV (PV予測)」を描画）
-     *
-     * ※x軸ラベルは、最初の行または年切替行はフル表示、それ以外は「M月」部分のみと表示
-     ************************************************/
+    // グラフ
     let chart1, chart2;
-    function renderCharts(simData) {
+    function renderCharts(simData){
       Chart.register(window["chartjs-plugin-annotation"]);
-      if (chart1) chart1.destroy();
-      if (chart2) chart2.destroy();
+      if(chart1) chart1.destroy();
+      if(chart2) chart2.destroy();
 
-      // 目標PVを取得
-      const goalPV = parseFloat(document.getElementById("goalPV").value) || 9000;
+      const goalPV= parseFloat(document.getElementById("goalPV").value)||9000;
 
-      // 1年目：最初の12カ月
-      const dataYear1 = simData.slice(0, 12);
-      const labelsYear1 = dataYear1.map((row, i) => {
-        if (i === 0 || row.newYearBreak) {
+      // 1年
+      const dataYear1= simData.slice(0,12);
+      const labelsYear1= dataYear1.map((row,i)=>{
+        if(i===0||row.newYearBreak){
           return row.monthLabel;
         } else {
           return row.monthLabel.split("年")[1];
         }
       });
-      const newRegYear1 = dataYear1.map((row) => parseInt(row.newReg || 0));
-      const lrpYear1 = dataYear1.map((row) => parseInt(row.lrp || 0));
-      const OVYear1 = dataYear1.map((row) => parseInt(row.OV.replace(/,/g, "")));
+      const newRegYear1= dataYear1.map(r=> parseInt(r.newReg||0));
+      const lrpYear1= dataYear1.map(r=> parseInt(r.lrp||0));
+      const OVYear1= dataYear1.map(r=> parseInt(r.OV.replace(/,/g,"")));
 
-      // 目標達成月のindexを探す
-      let achieveIndexYear1 = -1;
-      for (let i = 0; i < OVYear1.length; i++) {
-        if (OVYear1[i] >= goalPV) {
-          achieveIndexYear1 = i;
+      let achieveIndexYear1= -1;
+      for(let i=0; i<OVYear1.length; i++){
+        if(OVYear1[i]>= goalPV){
+          achieveIndexYear1= i;
           break;
         }
       }
 
-      // 達成月の強調色をベースカラーの傾向（薄いラベンダー～ピンク）に合わせる
-      const achieveBorderColor = "rgba(200,100,200,0.8)";
-      const achieveBgColor = "rgba(200,100,200,0.2)";
+      const achieveBorderColor= "rgba(200,100,200,0.8)";
+      const achieveBgColor= "rgba(200,100,200,0.2)";
 
-      const ctx1 = document.getElementById("chartYear1").getContext("2d");
-      chart1 = new Chart(ctx1, {
+      const ctx1= document.getElementById("chartYear1").getContext("2d");
+      chart1= new Chart(ctx1, {
         type: "bar",
         data: {
           labels: labelsYear1,
           datasets: [
             {
-              label: "新規登録者数",
-              data: newRegYear1,
-              backgroundColor: "rgba(209,196,233,0.7)",
-              stack: "stack1",
+              label:"新規登録者数",
+              data:newRegYear1,
+              backgroundColor:"rgba(209,196,233,0.7)",
+              stack:"stack1"
             },
             {
-              label: "LRP継続者数",
-              data: lrpYear1,
-              backgroundColor: "rgba(209,196,233,0.9)",
-              stack: "stack1",
+              label:"LRP継続者数",
+              data:lrpYear1,
+              backgroundColor:"rgba(209,196,233,0.9)",
+              stack:"stack1"
             },
             {
-              label: "OV (PV予測)",
-              data: OVYear1,
-              type: "line",
-              yAxisID: "yOv",
-              borderColor: "rgba(150,100,180,0.8)",
-              backgroundColor: "rgba(150,100,180,0.2)",
-              fill: true,
-              tension: 0.3,
-            },
-          ],
+              label:"OV (PV予測)",
+              data:OVYear1,
+              type:"line",
+              yAxisID:"yOv",
+              borderColor:"rgba(150,100,180,0.8)",
+              backgroundColor:"rgba(150,100,180,0.2)",
+              fill:true,
+              tension:0.3
+            }
+          ]
         },
-        options: {
-          responsive: true,
-          interaction: { mode: "index", intersect: false },
-          plugins: {
-            annotation: {
-              annotations: (() => {
-                // 達成があった場合のみアノテーション
-                if (achieveIndexYear1 === -1) return {};
+        options:{
+          responsive:true,
+          interaction:{mode:"index", intersect:false},
+          plugins:{
+            annotation:{
+              annotations:(()=>{
+                if(achieveIndexYear1===-1)return {};
                 return {
-                  line1: {
-                    type: "line",
+                  line1:{
+                    type:"line",
                     xMin: achieveIndexYear1,
                     xMax: achieveIndexYear1,
                     borderColor: achieveBorderColor,
-                    borderWidth: 2,
-                    label: {
-                      enabled: true,
-                      position: "top",
-                      content: "達成",
+                    borderWidth:2,
+                    label:{
+                      enabled:true,
+                      position:"top",
+                      content:"達成",
                       backgroundColor: achieveBgColor,
-                      color: achieveBorderColor,
-                    },
-                  },
+                      color: achieveBorderColor
+                    }
+                  }
                 };
-              })(),
-            },
+              })()
+            }
           },
-          scales: {
-            x: { stacked: true },
-            y: {
-              stacked: true,
-              title: { display: true, text: "数値" },
+          scales:{
+            x:{stacked:true},
+            y:{
+              stacked:true,
+              title:{display:true,text:"数値"}
             },
-            yOv: {
-              position: "right",
-              title: { display: true, text: "PV (OV)" },
-              grid: { drawOnChartArea: false },
-            },
-          },
-        },
+            yOv:{
+              position:"right",
+              title:{display:true,text:"PV (OV)"},
+              grid:{drawOnChartArea:false}
+            }
+          }
+        }
       });
 
-      // 2年目：残り12カ月
-      const dataYear2 = simData.slice(12, 24);
-      const labelsYear2 = dataYear2.map((row, i) => {
-        if (i === 0 || row.newYearBreak) {
+      // 2年
+      const dataYear2= simData.slice(12,24);
+      const labelsYear2= dataYear2.map((row,i)=>{
+        if(i===0||row.newYearBreak){
           return row.monthLabel;
         } else {
           return row.monthLabel.split("年")[1];
         }
       });
-      const newRegYear2 = dataYear2.map((row) => parseInt(row.newReg || 0));
-      const lrpYear2 = dataYear2.map((row) => parseInt(row.lrp || 0));
-      const OVYear2 = dataYear2.map((row) => parseInt(row.OV.replace(/,/g, "")));
+      const newRegYear2= dataYear2.map(r=> parseInt(r.newReg||0));
+      const lrpYear2= dataYear2.map(r=> parseInt(r.lrp||0));
+      const OVYear2= dataYear2.map(r=> parseInt(r.OV.replace(/,/g,"")));
 
-      // 達成月のindexを探す（ただし、1年目で達成していたら表示しない）
-      let achieveIndexYear2 = -1;
-      // もし1年目で達成していなければ、2年目の中で探す
-      if (achieveIndexYear1 === -1) {
-        for (let i = 0; i < OVYear2.length; i++) {
-          if (OVYear2[i] >= goalPV) {
-            achieveIndexYear2 = i;
+      let achieveIndexYear2= -1;
+      if(achieveIndexYear1===-1){
+        for(let i=0; i<OVYear2.length; i++){
+          if(OVYear2[i]>=goalPV){
+            achieveIndexYear2= i;
             break;
           }
         }
       }
 
-      const ctx2 = document.getElementById("chartYear2").getContext("2d");
-      chart2 = new Chart(ctx2, {
-        type: "bar",
-        data: {
+      const ctx2= document.getElementById("chartYear2").getContext("2d");
+      chart2= new Chart(ctx2, {
+        type:"bar",
+        data:{
           labels: labelsYear2,
-          datasets: [
+          datasets:[
             {
-              label: "新規登録者数",
-              data: newRegYear2,
-              backgroundColor: "rgba(209,196,233,0.7)",
-              stack: "stack2",
+              label:"新規登録者数",
+              data:newRegYear2,
+              backgroundColor:"rgba(209,196,233,0.7)",
+              stack:"stack2"
             },
             {
-              label: "LRP継続者数",
-              data: lrpYear2,
-              backgroundColor: "rgba(209,196,233,0.9)",
-              stack: "stack2",
+              label:"LRP継続者数",
+              data:lrpYear2,
+              backgroundColor:"rgba(209,196,233,0.9)",
+              stack:"stack2"
             },
             {
-              label: "OV (PV予測)",
-              data: OVYear2,
-              type: "line",
-              yAxisID: "yOv2",
-              borderColor: "rgba(150,100,180,0.8)",
-              backgroundColor: "rgba(150,100,180,0.2)",
-              fill: true,
-              tension: 0.3,
-            },
-          ],
+              label:"OV (PV予測)",
+              data:OVYear2,
+              type:"line",
+              yAxisID:"yOv2",
+              borderColor:"rgba(150,100,180,0.8)",
+              backgroundColor:"rgba(150,100,180,0.2)",
+              fill:true,
+              tension:0.3
+            }
+          ]
         },
-        options: {
-          responsive: true,
-          interaction: { mode: "index", intersect: false },
-          plugins: {
-            annotation: {
-              annotations: (() => {
-                if (achieveIndexYear2 === -1) return {};
+        options:{
+          responsive:true,
+          interaction:{mode:"index", intersect:false},
+          plugins:{
+            annotation:{
+              annotations:(()=>{
+                if(achieveIndexYear2===-1)return {};
                 return {
-                  line2: {
-                    type: "line",
+                  line2:{
+                    type:"line",
                     xMin: achieveIndexYear2,
                     xMax: achieveIndexYear2,
                     borderColor: achieveBorderColor,
-                    borderWidth: 2,
-                    label: {
-                      enabled: true,
-                      position: "top",
-                      content: "達成",
+                    borderWidth:2,
+                    label:{
+                      enabled:true,
+                      position:"top",
+                      content:"達成",
                       backgroundColor: achieveBgColor,
-                      color: achieveBorderColor,
-                    },
-                  },
+                      color: achieveBorderColor
+                    }
+                  }
                 };
-              })(),
-            },
+              })()
+            }
           },
-          scales: {
-            x: { stacked: true },
-            y: {
-              stacked: true,
-              title: { display: true, text: "数値" },
+          scales:{
+            x:{stacked:true},
+            y:{
+              stacked:true,
+              title:{display:true,text:"数値"}
             },
-            yOv2: {
-              position: "right",
-              title: { display: true, text: "PV (OV)" },
-              grid: { drawOnChartArea: false },
-            },
-          },
-        },
+            yOv2:{
+              position:"right",
+              title:{display:true,text:"PV (OV)"},
+              grid:{drawOnChartArea:false}
+            }
+          }
+        }
       });
     }
 
-    /************************************************
-     * 更新ボタン押下時の処理
-     ************************************************/
-    function onUpdate() {
+    function onUpdate(){
       updateKpiResults();
-      const simData = recalcKpiData();
+      const simData= recalcKpiData();
       populateKpiTable(simData);
       renderCharts(simData);
     }
 
-    /************************************************
-     * ページ読み込み時の初期処理
-     ************************************************/
-    window.addEventListener("DOMContentLoaded", () => {
+    window.addEventListener("DOMContentLoaded", ()=>{
       document.getElementById("updateBtn").addEventListener("click", onUpdate);
       onUpdate();
     });
