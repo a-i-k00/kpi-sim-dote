@@ -65,8 +65,79 @@
       color: #444444;
       text-align: center;
       max-width: 800px;
-      margin: 0 auto 20px;
+      margin: 0 auto 30px;
       line-height: 1.5;
+      /* グラスモーフィズム効果 */
+      background: rgba(255, 255, 255, 0.4);
+      backdrop-filter: blur(5px);
+      -webkit-backdrop-filter: blur(5px);
+      padding: 20px;
+      border-radius: 12px;
+      /* Y2K風の薄いボーダー */
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+    }
+    /* リストスタイル */
+    .explanation ul {
+      list-style-type: none;
+      margin: 15px 0;
+      padding: 0;
+      text-align: left;
+      display: inline-block;
+    }
+    .explanation li {
+      margin-bottom: 8px;
+      position: relative;
+      padding-left: 25px;
+    }
+    .explanation li:before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      color: #fc6076;
+      font-weight: bold;
+    }
+    .guide-text {
+      margin-top: 15px;
+      font-weight: 500;
+      color: #6a11cb;
+    }
+    /* セクションヘッダー */
+    .section-header {
+      margin-bottom: 15px;
+      text-align: center;
+      color: #6a11cb;
+    }
+    .section-header h3 {
+      margin-bottom: 5px;
+      font-size: 1.2rem;
+    }
+    .section-header p {
+      margin: 0;
+      font-size: 0.9rem;
+      color: #555;
+    }
+    /* ヘルパーテキスト */
+    .helper-text {
+      font-size: 0.8rem;
+      color: #666;
+      margin-top: 4px;
+      margin-bottom: 8px;
+      font-style: italic;
+    }
+    /* セクションの説明文 */
+    .section-desc {
+      font-size: 0.85rem;
+      color: #555;
+      margin-bottom: 15px;
+      text-align: center;
+    }
+    /* チャート説明 */
+    .chart-desc {
+      font-size: 0.85rem;
+      color: #555;
+      text-align: center;
+      margin-bottom: 15px;
     }
     .container {
       max-width: 1200px;
@@ -887,14 +958,22 @@
   <div class="particle-container"></div>
   <div class="container">
     <h1>ドテラ目標達成シミュレーション</h1>
-    <p class="explanation">
-      下記フォームで【現在のPV】、【今年の目標Rank】、【目標PV】に加え、「新規登録者目標数(月平均)」
-      （＝毎月の新規登録者数期待値）と【目標設定日】を入力すると、ファネル型のシミュレーション（各月24カ月分）・グラフ、
-      さらにシミュレーションのPV予測（OV）が目標PVに初めて到達する月を自動判定して表示します。
-    </p>
+    <div class="explanation">
+      <h3>👇 このツールでできること</h3>
+      <ul>
+        <li>今後24ヶ月間のドテラビジネス成長をシミュレーション</li>
+        <li>目標のPV達成時期を予測</li>
+        <li>必要な新規登録者数や育成ビルダー数を計算</li>
+      </ul>
+      <p class="guide-text">下記の入力フォームに必要事項を入力するだけで、あなたのドテラビジネスの目標達成時期を自動予測します。</p>
+    </div>
 
     <!-- 入力フォーム -->
     <div class="input-section">
+      <div class="section-header">
+        <h3>📝 基本情報の入力</h3>
+        <p>現在の状況と目標を入力してください</p>
+      </div>
       <div class="input-group">
         <label for="currentPV">現在の PV</label>
         <input type="number" id="currentPV" value="3000" min="0" />
@@ -942,7 +1021,8 @@
     <!-- 出力ブロック： 目安表 + KPI&目標Rank達成 -->
     <div class="output-container">
       <div class="reference-container">
-        <strong>ランク別目標値 目安表</strong>
+        <h3 class="section-header">📊 ランク別目標値 目安表</h3>
+        <p class="section-desc">各ランク達成に必要なPVと登録者数、およびおおよその収入目安</p>
         <table class="reference-table">
           <thead>
             <tr>
@@ -1023,7 +1103,8 @@
       
       <!-- 新しいアコーディオン式ダッシュボード -->
       <div class="kpi-accordion-container">
-        <h3 class="accordion-section-title">あなたの目標達成に向けた数値</h3>
+        <h3 class="accordion-section-title">✨ あなたの目標達成に向けた予測</h3>
+        <p class="section-desc">入力情報をもとに計算された重要指標</p>
         <div class="accordion-container" id="kpiAccordionContainer">
           <!-- JavaScriptで動的に生成 -->
         </div>
@@ -1033,19 +1114,22 @@
     <!-- チャート表示エリア -->
     <div class="charts-wrapper">
       <div class="chart-container">
-        <h2>1年予測</h2>
+        <h2>1年予測グラフ</h2>
+        <p class="chart-desc">最初の12ヶ月間の登録者数と累積PV予測</p>
         <canvas id="chartYear1"></canvas>
       </div>
       <div class="chart-container">
-        <h2>2年予測</h2>
+        <h2>2年予測グラフ</h2>
+        <p class="chart-desc">13ヶ月目から24ヶ月目の登録者数と累積PV予測</p>
         <canvas id="chartYear2"></canvas>
       </div>
     </div>
 
     <!-- KPI シミュレーション テーブル（24カ月分） -->
-    <h2>KPI シミュレーション (月次)</h2>
+    <h2>💹 KPI シミュレーション (月次詳細)</h2>
     <div class="table-note">
-      <p><strong>LRP継続率：80%</strong> - 新規登録者の80%がLRPを継続すると想定しています。このシミュレーションでは毎月の新規登録者の80%がLRPに継続する前提で計算しています。</p>
+      <p><strong>LRP継続率：80%</strong> - 新規登録者の80%がLRP（ロイヤルティ・リワード・プログラム）を継続すると想定しています。このシミュレーションでは毎月の新規登録者の80%がLRPに継続する前提で計算しています。</p>
+      <p><strong>PV予測（OV）</strong> - 計算式：現在のPV + (月数 × 新規登録者数 × 150ポイント)</p>
     </div>
     <table id="kpiTable">
       <thead>
@@ -1080,13 +1164,13 @@
 
     <!-- シナリオ保存機能 -->
     <div class="scenario-container">
-      <div class="scenario-title">シナリオ保存</div>
+      <div class="scenario-title">💾 シナリオ保存</div>
       <p class="scenario-description">
         現在の設定を名前を付けて保存します。保存したシナリオはブラウザのローカルストレージに記録され、
-        このデバイスとブラウザでのみ利用できます。
+        このデバイスとブラウザでのみ利用できます。異なる目標設定を試し、比較することができます。
       </p>
       <div class="scenario-form">
-        <input type="text" id="scenarioName" placeholder="シナリオ名を入力">
+        <input type="text" id="scenarioName" placeholder="シナリオ名を入力（例：SILVER目標2025年）">
         <button id="saveScenarioBtn" class="button-hover">シナリオ保存</button>
       </div>
       <div class="scenario-list">
@@ -1932,10 +2016,10 @@
       
       // ツールチップの追加
       addTooltip("currentPV", "現在のPV（ポイントバリュー）の値を入力してください。");
-      addTooltip("yearGoal", "今年の目標ランクを選択してください。");
+      addTooltip("yearGoal", "達成したい今年の目標ランクを選択してください。");
       addTooltip("goalPV", "達成したい目標PVを入力してください。");
       addTooltip("monthlyTarget", "毎月の新規登録者数の目標値を入力してください。");
-      addTooltip("targetDate", "目標設定の開始日を選択してください。");
+      addTooltip("targetDate", "いつから目標達成に向けて取り組むか設定してください。");
       
       onUpdate();
     });
