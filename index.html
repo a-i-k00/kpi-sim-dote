@@ -536,6 +536,19 @@
         max-width: 100%;
         -webkit-overflow-scrolling: touch;
       }
+      
+      /* グラフ表示の高さ調整 */
+      .chart-container {
+        height: auto;
+        min-height: 350px;
+        padding: 10px;
+      }
+      
+      /* キャンバスのサイズ調整 */
+      canvas {
+        height: 300px !important;
+        width: 100% !important;
+      }
     }
     
     @media (max-width: 480px) {
@@ -557,6 +570,15 @@
       
       h1 {
         font-size: 1.8rem;
+      }
+      
+      /* グラフの高さをさらに調整 */
+      .chart-container {
+        min-height: 300px;
+      }
+      
+      canvas {
+        height: 250px !important;
       }
     }
 
@@ -951,6 +973,46 @@
         transform: translateY(-100vh) rotate(360deg);
         opacity: 0;
       }
+    }
+
+    /* 目安表のスクロール対応 */
+    .reference-container {
+      overflow-x: auto;
+      position: relative;
+      -webkit-overflow-scrolling: touch;
+    }
+    
+    .reference-table {
+      min-width: 500px; /* 最小幅を設定して横スクロールを確保 */
+    }
+    
+    /* スクロール可能であることを示すインジケーター */
+    .scroll-indicator {
+      position: absolute;
+      right: 10px;
+      bottom: 10px;
+      background: rgba(252, 96, 118, 0.7);
+      color: white;
+      padding: 5px 8px;
+      border-radius: 20px;
+      font-size: 0.7rem;
+      opacity: 0.8;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    
+    .reference-container::-webkit-scrollbar {
+      height: 6px;
+    }
+    
+    .reference-container::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 3px;
+    }
+    
+    .reference-container::-webkit-scrollbar-thumb {
+      background: rgba(252, 96, 118, 0.5);
+      border-radius: 3px;
     }
   </style>
 </head>
@@ -1476,6 +1538,10 @@
       if(chart2) chart2.destroy();
 
       const goalPV= parseFloat(document.getElementById("goalPV").value)||9000;
+      
+      // レスポンシブ設定のための画面幅取得
+      const isMobile = window.innerWidth < 768;
+      const aspectRatio = isMobile ? 0.75 : 2; // モバイル時はより縦長に
 
       // 1年
       const dataYear1= simData.slice(0,12);
@@ -1483,7 +1549,8 @@
         if(i===0||row.newYearBreak){
           return row.monthLabel;
         } else {
-          return row.monthLabel.split("年")[1];
+          // モバイル表示時は月表示をさらに簡略化
+          return isMobile ? row.monthLabel.split("年")[1].replace("月", "") : row.monthLabel.split("年")[1];
         }
       });
       const newRegYear1= dataYear1.map(r=> parseInt(r.newReg||0));
@@ -1533,8 +1600,21 @@
         },
         options:{
           responsive:true,
+          maintainAspectRatio: false, // falseに変更してCSSで高さを指定
+          devicePixelRatio: 2, // 高解像度対応
           interaction:{mode:"index", intersect:false},
           plugins:{
+            legend: {
+              position: 'top',
+              align: 'center',
+              labels: {
+                boxWidth: isMobile ? 12 : 40,
+                padding: isMobile ? 8 : 10,
+                font: {
+                  size: isMobile ? 10 : 12
+                }
+              }
+            },
             annotation:{
               annotations:(()=>{
                 if(achieveIndexYear1===-1)return {};
@@ -1550,23 +1630,66 @@
                       position:"top",
                       content:"達成",
                       backgroundColor: achieveBgColor,
-                      color: achieveBorderColor
+                      color: achieveBorderColor,
+                      font: {
+                        size: isMobile ? 10 : 12
+                      }
                     }
                   }
                 };
               })()
+            },
+            tooltip: {
+              enabled: true,
+              mode: 'index',
+              intersect: false,
+              bodyFont: {
+                size: isMobile ? 11 : 12
+              },
+              titleFont: {
+                size: isMobile ? 11 : 12
+              },
+              padding: isMobile ? 8 : 10,
+              displayColors: true,
+              boxWidth: 10
             }
           },
           scales:{
-            x:{stacked:true},
+            x:{
+              stacked:true,
+              ticks: {
+                maxRotation: isMobile ? 45 : 0,
+                autoSkip: isMobile,
+                maxTicksLimit: isMobile ? 6 : 12, // モバイルでは表示数を制限
+                font: {
+                  size: isMobile ? 9 : 12
+                }
+              }
+            },
             y:{
               stacked:true,
-              title:{display:true,text:"数値"}
+              title:{
+                display: !isMobile,
+                text:"数値"
+              },
+              ticks: {
+                font: {
+                  size: isMobile ? 9 : 12
+                }
+              }
             },
             yOv:{
               position:"right",
-              title:{display:true,text:"PV (OV)"},
-              grid:{drawOnChartArea:false}
+              title:{
+                display: !isMobile,
+                text:"PV (OV)"
+              },
+              grid:{drawOnChartArea:false},
+              ticks: {
+                font: {
+                  size: isMobile ? 9 : 12
+                }
+              }
             }
           }
         }
@@ -1578,7 +1701,8 @@
         if(i===0||row.newYearBreak){
           return row.monthLabel;
         } else {
-          return row.monthLabel.split("年")[1];
+          // モバイル表示時は月表示をさらに簡略化
+          return isMobile ? row.monthLabel.split("年")[1].replace("月", "") : row.monthLabel.split("年")[1];
         }
       });
       const newRegYear2= dataYear2.map(r=> parseInt(r.newReg||0));
@@ -1627,8 +1751,21 @@
         },
         options:{
           responsive:true,
+          maintainAspectRatio: false, // falseに変更してCSSで高さを指定
+          devicePixelRatio: 2, // 高解像度対応
           interaction:{mode:"index", intersect:false},
           plugins:{
+            legend: {
+              position: 'top',
+              align: 'center',
+              labels: {
+                boxWidth: isMobile ? 12 : 40,
+                padding: isMobile ? 8 : 10,
+                font: {
+                  size: isMobile ? 10 : 12
+                }
+              }
+            },
             annotation:{
               annotations:(()=>{
                 if(achieveIndexYear2===-1)return {};
@@ -1644,29 +1781,117 @@
                       position:"top",
                       content:"達成",
                       backgroundColor: achieveBgColor,
-                      color: achieveBorderColor
+                      color: achieveBorderColor,
+                      font: {
+                        size: isMobile ? 10 : 12
+                      }
                     }
                   }
                 };
               })()
+            },
+            tooltip: {
+              enabled: true,
+              mode: 'index',
+              intersect: false,
+              bodyFont: {
+                size: isMobile ? 11 : 12
+              },
+              titleFont: {
+                size: isMobile ? 11 : 12
+              },
+              padding: isMobile ? 8 : 10,
+              displayColors: true,
+              boxWidth: 10
             }
           },
           scales:{
-            x:{stacked:true},
+            x:{
+              stacked:true,
+              ticks: {
+                maxRotation: isMobile ? 45 : 0,
+                autoSkip: isMobile,
+                maxTicksLimit: isMobile ? 6 : 12, // モバイルでは表示数を制限
+                font: {
+                  size: isMobile ? 9 : 12
+                }
+              }
+            },
             y:{
               stacked:true,
-              title:{display:true,text:"数値"}
+              title:{
+                display: !isMobile,
+                text:"数値"
+              },
+              ticks: {
+                font: {
+                  size: isMobile ? 9 : 12
+                }
+              }
             },
             yOv2:{
               position:"right",
-              title:{display:true,text:"PV (OV)"},
-              grid:{drawOnChartArea:false}
+              title:{
+                display: !isMobile,
+                text:"PV (OV)"
+              },
+              grid:{drawOnChartArea:false},
+              ticks: {
+                font: {
+                  size: isMobile ? 9 : 12
+                }
+              }
             }
           }
         }
       });
     }
 
+    // ウィンドウサイズ変更時にグラフを再レンダリング
+    window.addEventListener('resize', debounce(() => {
+      const simData = recalcKpiData();
+      renderCharts(simData);
+    }, 300));
+    
+    // スクロールインジケーターの表示・非表示制御
+    function setupScrollIndicator() {
+      const referenceContainer = document.querySelector('.reference-container');
+      
+      if (!referenceContainer) return;
+      
+      // スクロールインジケーターを追加
+      const indicator = document.createElement('div');
+      indicator.className = 'scroll-indicator';
+      indicator.textContent = '← スクロール →';
+      referenceContainer.appendChild(indicator);
+      
+      // 横幅がコンテナより大きい場合のみインジケーターを表示
+      function updateIndicator() {
+        if (referenceContainer.scrollWidth > referenceContainer.clientWidth) {
+          indicator.style.display = 'block';
+          
+          // スクロール位置によって表示・非表示
+          if (referenceContainer.scrollLeft > 0 && 
+              referenceContainer.scrollLeft + referenceContainer.clientWidth < referenceContainer.scrollWidth - 10) {
+            indicator.textContent = '← スクロール →';
+          } else if (referenceContainer.scrollLeft === 0) {
+            indicator.textContent = 'スクロール →';
+          } else {
+            indicator.textContent = '← スクロール';
+          }
+        } else {
+          indicator.style.display = 'none';
+        }
+      }
+      
+      // スクロールイベントの監視
+      referenceContainer.addEventListener('scroll', updateIndicator);
+      window.addEventListener('resize', updateIndicator);
+      
+      // 初期状態の更新
+      updateIndicator();
+    }
+    
     // シミュレーションデータをCSVにエクスポート
     function exportToCSV(simData) {
       // ヘッダー行
@@ -2022,6 +2247,9 @@
       addTooltip("targetDate", "いつから目標達成に向けて取り組むか設定してください。");
       
       onUpdate();
+      
+      // 新しく追加した参照テーブルスクロールインジケーター
+      setupScrollIndicator();
     });
   </script>
 </body>
